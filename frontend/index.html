@@ -9,7 +9,6 @@
 <body>
   <header id="main-header">
     <h1>🍌 CloudBanana</h1>
-    <p>Server Management Dashboard</p>
   </header>
 
   <div id="auth-section">
@@ -52,43 +51,48 @@
   </div>
 
   <div id="dashboard" style="display:none;">
-    <div id="dashboard-header">
-      <span id="user-info"></span>
-      <button id="logout-btn" class="btn btn-small">Logout</button>
+    <div id="dash-header">
+      <div id="dash-user"><span id="user-info"></span></div>
+      <button id="logout-btn" class="btn-outline">Logout</button>
     </div>
 
-    <section id="stats">
-      <h2>System Resources</h2>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <h3>CPU</h3>
-          <p id="cpu-usage">--</p>
-        </div>
-        <div class="stat-card">
-          <h3>RAM</h3>
-          <p id="ram-usage">--</p>
-        </div>
-        <div class="stat-card">
-          <h3>Disk</h3>
-          <p id="disk-usage">--</p>
-        </div>
-      </div>
-    </section>
+    <nav id="tabs">
+      <button class="tab active" data-tab="tab-dashboard">Dashboard</button>
+      <button class="tab" data-tab="tab-users" id="tab-users-btn" style="display:none;">Users</button>
+    </nav>
 
-    <section id="actions">
-      <h2>Quick Actions</h2>
-      <button id="install-docker" class="btn">Install Docker</button>
-      <div id="status-message" class="msg"></div>
-    </section>
+    <div id="tab-content">
+      <section id="tab-dashboard" class="tab-pane active">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">CPU</div>
+            <div class="stat-value" id="cpu-usage">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">RAM</div>
+            <div class="stat-value" id="ram-usage">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Disk</div>
+            <div class="stat-value" id="disk-usage">--</div>
+          </div>
+        </div>
 
-    <section id="admin-panel" style="display:none;">
-      <h2>User Management</h2>
-      <div class="admin-grid">
-        <div class="admin-card">
+        <div class="card">
+          <h3>Quick Actions</h3>
+          <button id="install-docker" class="btn">Install Docker</button>
+          <div id="status-message" class="msg"></div>
+        </div>
+      </section>
+
+      <section id="tab-users" class="tab-pane">
+        <div class="card">
           <h3>Add User</h3>
-          <input type="text" id="new-username" placeholder="Username">
-          <input type="email" id="new-email" placeholder="Email">
-          <div class="pw-field">
+          <div class="form-row">
+            <input type="text" id="new-username" placeholder="Username">
+            <input type="email" id="new-email" placeholder="Email">
+          </div>
+          <div class="pw-field" style="max-width:300px;">
             <input type="password" id="new-password" placeholder="Password">
             <button class="pw-toggle" data-target="new-password" type="button" aria-label="Toggle password visibility">
               <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -98,12 +102,13 @@
           <button id="add-user-btn" class="btn">Add User</button>
           <div id="add-user-error" class="msg"></div>
         </div>
-        <div class="admin-card">
+
+        <div class="card">
           <h3>Existing Users</h3>
           <div id="user-list"></div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </div>
 
   <script src="app.js"></script>

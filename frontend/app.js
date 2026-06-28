@@ -23,6 +23,13 @@ function show(id) {
   if (el) el.style.display = 'block';
 }
 
+function activateTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(name).classList.add('active');
+}
+
 async function init() {
   try {
     const check = await api('/auth/check');
@@ -37,19 +44,21 @@ async function init() {
     if (!check.admin_exists) show('register-form');
     else show('login-form');
   } catch (e) {
-    document.getElementById('register-form').querySelector('h2').textContent = 'Server Error';
-    document.getElementById('register-form').querySelector('.subtitle').textContent = 'Could not connect to server. Make sure the backend is running.';
+    const box = document.getElementById('register-form');
+    box.querySelector('h2').textContent = 'Server Error';
+    box.querySelector('.subtitle').textContent = 'Could not connect to server.';
     show('register-form');
   }
 }
 
 async function enterDashboard(user) {
   show('dashboard');
-  document.getElementById('user-info').textContent = `Logged in as ${user.username} (${user.role})`;
+  document.getElementById('user-info').textContent = `${user.username} · ${user.role}`;
   if (user.role === 'admin') {
-    document.getElementById('admin-panel').style.display = 'block';
+    document.getElementById('tab-users-btn').style.display = 'inline-block';
     loadUsers();
   }
+  activateTab('tab-dashboard');
   fetchStats();
   setInterval(fetchStats, 5000);
 }
@@ -83,11 +92,32 @@ async function loadUsers() {
   } catch {}
 }
 
-function msg(id, text, isError = false) {
+function msg(id, text, isError) {
   const el = document.getElementById(id);
   el.textContent = text;
   el.className = 'msg' + (isError ? ' error' : '');
 }
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => activateTab(tab.dataset.tab));
+});
+
+document.querySelectorAll('.pw-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.target);
+    const open = btn.querySelector('.eye-open');
+    const closed = btn.querySelector('.eye-closed');
+    if (input.type === 'password') {
+      input.type = 'text';
+      open.style.display = 'none';
+      closed.style.display = 'block';
+    } else {
+      input.type = 'password';
+      open.style.display = 'block';
+      closed.style.display = 'none';
+    }
+  });
+});
 
 document.getElementById('reg-btn').addEventListener('click', async () => {
   const username = document.getElementById('reg-username').value;
@@ -151,23 +181,6 @@ document.getElementById('add-user-btn').addEventListener('click', async () => {
   } catch (e) {
     msg('add-user-error', e.message, true);
   }
-});
-
-document.querySelectorAll('.pw-toggle').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const input = document.getElementById(btn.dataset.target);
-    const open = btn.querySelector('.eye-open');
-    const closed = btn.querySelector('.eye-closed');
-    if (input.type === 'password') {
-      input.type = 'text';
-      open.style.display = 'none';
-      closed.style.display = 'block';
-    } else {
-      input.type = 'password';
-      open.style.display = 'block';
-      closed.style.display = 'none';
-    }
-  });
 });
 
 init();
