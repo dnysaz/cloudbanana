@@ -16,7 +16,7 @@ from app.apps import APPS, get_all_status, get_script_path
 from pathlib import Path
 from pydantic import BaseModel, field_validator
 
-app = FastAPI(title="CloudBanana Core API", version="0.1.0")
+app = FastAPI(title="CloudBanana DE API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,

@@ -3,265 +3,381 @@ const CHART_POINTS = 30;
 
 let token = localStorage.getItem('token');
 let cpuHistory = new Array(CHART_POINTS).fill(0);
-let statsInterval;
-let appsInterval;
+let statsInterval, clockInterval;
+let winZIndex = 100;
+let openWindows = {};
+let startMenuOpen = false;
 
+/* ========== API ========== */
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${API}${path}`, { ...opts, headers });
   let data;
-  try {
-    data = await res.json();
-  } catch {
-    const text = await res.text();
-    throw new Error(text || 'Request failed');
-  }
+  try { data = await res.json(); }
+  catch { const text = await res.text(); throw new Error(text || 'Request failed'); }
   if (!res.ok) throw new Error(data.detail || 'Request failed');
   return data;
 }
 
-function show(id) {
-  document.querySelectorAll('#auth-section > div, #dashboard').forEach(el => el.style.display = 'none');
-  const el = document.getElementById(id);
-  if (el) el.style.display = 'block';
+function bytesToGb(bytes) { return (bytes / (1024 ** 3)).toFixed(1); }
+
+/* ========== WINDOW MANAGER ========== */
+function openWindow(id, title) {
+  if (openWindows[id]) { focusWindow(id); return; }
+
+  const ws = document.getElementById('desktop-workspace');
+  const win = document.createElement('div');
+  win.className = 'win';
+  win.id = 'win-' + id;
+  win.style.zIndex = ++winZIndex;
+
+  // Position with slight random offset for multiple windows
+  const count = Object.keys(openWindows).length;
+  win.style.left = (40 + count * 24) + 'px';
+  win.style.top = (30 + count * 20) + 'px';
+
+  win.innerHTML = `
+    <div class="win-header">
+      <span class="win-title">${title}</span>
+      <button class="win-close" data-win="${id}">✕</button>
+    </div>
+    <div class="win-body"></div>`;
+
+  win.querySelector('.win-close').addEventListener('click', () => closeWindow(id));
+  win.addEventListener('mousedown', () => focusWindow(id));
+  ws.appendChild(win);
+
+  // Taskbar item
+  const taskItems = document.getElementById('task-items');
+  const taskBtn = document.createElement('button');
+  taskBtn.className = 'task-item active';
+  taskBtn.textContent = title;
+  taskBtn.addEventListener('click', () => {
+    if (openWindows[id]) focusWindow(id);
+  });
+  taskItems.appendChild(taskBtn);
+
+  openWindows[id] = { win, taskBtn };
+  loadContent(id);
 }
 
-function activateTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
-  document.getElementById(name).classList.add('active');
-  if (name === 'tab-apps') loadApps();
-  if (name === 'tab-users') loadUsers();
+function closeWindow(id) {
+  if (!openWindows[id]) return;
+  openWindows[id].win.remove();
+  openWindows[id].taskBtn.remove();
+  delete openWindows[id];
 }
 
-function bytesToGb(bytes) {
-  return (bytes / (1024 ** 3)).toFixed(1);
+function focusWindow(id) {
+  if (!openWindows[id]) return;
+  openWindows[id].win.style.zIndex = ++winZIndex;
+  Object.keys(openWindows).forEach(k => {
+    const btn = openWindows[k].taskBtn;
+    btn.classList.toggle('active', k === id);
+  });
 }
 
-function msg(id, text, isError) {
-  const el = document.getElementById(id);
-  el.textContent = text;
-  el.className = 'msg' + (isError ? ' error' : '');
+function loadContent(id) {
+  const body = document.querySelector(`#win-${id} .win-body`);
+  if (!body) return;
+  if (id === 'taskmgr') renderTaskMgr(body);
+  else if (id === 'apps') renderApps(body);
+  else if (id === 'users') renderUsers(body);
+  else if (id === 'subdomain') renderSubdomain(body);
+  else if (id === 'www') renderWww(body);
 }
 
-/* ---- Chart ---- */
-function drawCpuChart(history) {
-  const canvas = document.getElementById('cpu-chart');
+/* ========== TASK MANAGER ========== */
+function renderTaskMgr(body) {
+  body.className = 'win-body tm-pad';
+  body.innerHTML = `
+    <div class="tm-grid">
+      <div class="tm-left">
+        <div class="tm-cpu-label">
+          <span>CPU</span>
+          <span id="tm-cpu-val">0%</span>
+        </div>
+        <div class="tm-chart-wrap">
+          <canvas id="tm-chart"></canvas>
+        </div>
+        <div class="tm-uptime">Uptime: <span id="tm-uptime">--</span></div>
+      </div>
+      <div class="tm-right">
+        ${barHtml('Disk', 'tm-disk-val', 'tm-disk-bar', 'tm-disk')}
+        ${barHtml('RAM', 'tm-ram-val', 'tm-ram-bar', 'tm-ram')}
+        <div>
+          <div class="tm-bar-label"><span>Swap</span><span id="tm-swap-val">0%</span></div>
+          <div class="tm-bar-track"><div class="tm-bar-fill tm-swap" id="tm-swap-bar" style="width:0%"></div></div>
+          <div class="tm-bar-detail" id="tm-swap-detail">0 / 0 GB</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function barHtml(name, valId, barId, cls) {
+  return `<div>
+    <div class="tm-bar-label"><span>${name}</span><span id="${valId}">0%</span></div>
+    <div class="tm-bar-track"><div class="tm-bar-fill ${cls}" id="${barId}" style="width:0%"></div></div>
+  </div>`;
+}
+
+/* ========== APPLICATIONS ========== */
+function renderApps(body) {
+  body.innerHTML = '<div id="apps-list"></div><div id="apps-msg" class="msg"></div>';
+  loadApps();
+}
+
+async function loadApps() {
+  const el = document.getElementById('apps-list');
+  if (!el) return;
+  try {
+    const apps = await api('/apps/status');
+    el.innerHTML = apps.map(a => `
+      <div class="app-item">
+        <div class="app-info">
+          <strong>${a.name}</strong>
+          <span class="app-desc">${a.desc}${a.version ? ' · v' + a.version : ''}</span>
+        </div>
+        <div class="app-action">
+          <span class="badge ${a.installed ? 'badge-yes' : 'badge-no'}">${a.installed ? a.version || 'Installed' : 'Not installed'}</span>
+          ${!a.installed ? `<button class="btn btn-install" data-app="${a.id}">Install</button>` : ''}
+        </div>
+      </div>`).join('');
+    el.querySelectorAll('.btn-install').forEach(b => b.addEventListener('click', async () => {
+      msg('apps-msg', 'Installing...');
+      try {
+        const d = await api(`/apps/install/${b.dataset.app}`, { method: 'POST' });
+        msg('apps-msg', d.message);
+        setTimeout(loadApps, 4000);
+      } catch (e) { msg('apps-msg', e.message, true); }
+    }));
+  } catch {}
+}
+
+/* ========== USERS ========== */
+function renderUsers(body) {
+  body.className = 'win-body win-content';
+  body.innerHTML = `
+    <input type="text" id="new-username" placeholder="Username">
+    <input type="email" id="new-email" placeholder="Email">
+    <input type="password" id="new-password" placeholder="Password">
+    <button class="btn" id="add-user-btn">Add User</button>
+    <div id="add-user-msg" class="msg"></div>
+    <div style="margin-top:1rem;font-size:0.75rem;font-weight:600;color:#a1a1aa;text-transform:uppercase;letter-spacing:0.3px;">Existing Users</div>
+    <div id="user-list" style="margin-top:0.5rem;"></div>`;
+  document.getElementById('add-user-btn').addEventListener('click', addUser);
+  loadUsers();
+}
+
+async function loadUsers() {
+  const el = document.getElementById('user-list');
+  if (!el) return;
+  try {
+    const users = await api('/auth/users');
+    el.innerHTML = users.map(u =>
+      `<div class="user-row"><span>${u.username}</span><span class="badge badge-${u.role}">${u.role}</span></div>`
+    ).join('');
+  } catch {}
+}
+
+async function addUser() {
+  const username = document.getElementById('new-username').value;
+  const email = document.getElementById('new-email').value;
+  const password = document.getElementById('new-password').value;
+  try {
+    await api('/auth/users', { method: 'POST', body: JSON.stringify({ username, email, password, role: 'user' }) });
+    msg('add-user-msg', `User ${username} created`);
+    document.getElementById('new-username').value = '';
+    document.getElementById('new-email').value = '';
+    document.getElementById('new-password').value = '';
+    loadUsers();
+  } catch (e) { msg('add-user-msg', e.message, true); }
+}
+
+/* ========== SUBDOMAIN ========== */
+function renderSubdomain(body) {
+  body.className = 'win-body win-content';
+  body.innerHTML = `
+    <div class="form-row">
+      <input type="text" id="sub-name" placeholder="Subdomain (e.g. api)">
+      <input type="text" id="sub-domain" placeholder="Domain (e.g. example.com)">
+    </div>
+    <button class="btn" id="sub-btn">Create Subdomain</button>
+    <div id="sub-msg" class="msg"></div>`;
+  document.getElementById('sub-btn').addEventListener('click', async () => {
+    const subdomain = document.getElementById('sub-name').value;
+    const domain = document.getElementById('sub-domain').value;
+    try {
+      const d = await api('/subdomain', { method: 'POST', body: JSON.stringify({ subdomain, domain }) });
+      msg('sub-msg', d.message);
+    } catch (e) { msg('sub-msg', e.message, true); }
+  });
+}
+
+/* ========== WWW ========== */
+function renderWww(body) {
+  body.className = 'win-body win-content';
+  body.innerHTML = `
+    <div id="www-list"></div>
+    <div class="form-row" style="margin-top:0.75rem;">
+      <input type="text" id="www-name" placeholder="Folder name">
+      <button class="btn" id="www-btn">Create</button>
+    </div>
+    <div id="www-msg" class="msg"></div>`;
+  document.getElementById('www-btn').addEventListener('click', async () => {
+    const name = document.getElementById('www-name').value;
+    try {
+      await api('/www', { method: 'POST', body: JSON.stringify({ name }) });
+      msg('www-msg', `Folder ${name} created`);
+      document.getElementById('www-name').value = '';
+      loadWww();
+    } catch (e) { msg('www-msg', e.message, true); }
+  });
+  loadWww();
+}
+
+async function loadWww() {
+  const el = document.getElementById('www-list');
+  if (!el) return;
+  try {
+    const data = await api('/www');
+    el.innerHTML = data.items.length
+      ? data.items.map(i => `<div class="www-row">${i.is_dir ? '📁' : '📄'} ${i.name}</div>`).join('')
+      : '<div class="www-empty">Empty</div>';
+  } catch {}
+}
+
+/* ========== STATS ========== */
+function formatUptime(s) {
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  return (d ? d + 'd ' : '') + (h ? h + 'h ' : '') + m + 'm';
+}
+
+function drawChart(history) {
+  const canvas = document.getElementById('tm-chart');
+  if (!canvas) return;
   const rect = canvas.parentElement.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  const w = Math.min(400, rect.width - 32) * dpr;
-  const h = 130 * dpr;
-  canvas.width = w;
-  canvas.height = h;
-  canvas.style.width = (w / dpr) + 'px';
-  canvas.style.height = '100px';
-
+  const w = Math.max(100, rect.width) * dpr;
+  const h = rect.height * dpr;
+  canvas.width = w; canvas.height = h;
+  canvas.style.width = (w / dpr) + 'px'; canvas.style.height = (h / dpr) + 'px';
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
-
-  const pad = 4 * dpr;
-  const cw = w - pad * 2;
-  const ch = h - pad * 2;
-
+  const pad = 4 * dpr, cw = w - pad * 2, ch = h - pad * 2;
   const pts = history.map((v, i) => ({
     x: (i / (CHART_POINTS - 1)) * cw + pad,
     y: ch + pad - (v / 100) * ch
   }));
 
-  // Gradient fill under curve
+  const last = pts[pts.length - 1];
   ctx.beginPath();
   ctx.moveTo(pts[0].x, ch + pad);
-  for (let i = 1; i < pts.length - 2; i++) {
-    const xc = (pts[i].x + pts[i + 1].x) / 2;
-    const yc = (pts[i].y + pts[i + 1].y) / 2;
-    ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+  ctx.lineTo(pts[0].x, pts[0].y);
+  for (let i = 0; i < pts.length - 2; i++) {
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2);
   }
-  const last = pts[pts.length - 1];
-  ctx.lineTo(last.x, last.y);
-  ctx.lineTo(last.x, ch + pad);
-  ctx.closePath();
-
+  ctx.lineTo(last.x, last.y); ctx.lineTo(last.x, ch + pad); ctx.closePath();
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, 'rgba(245, 158, 11, 0.12)');
-  grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.04)');
-  grad.addColorStop(1, 'rgba(245, 158, 11, 0.01)');
-  ctx.fillStyle = grad;
-  ctx.fill();
+  grad.addColorStop(0, 'rgba(245,158,11,0.15)'); grad.addColorStop(0.6, 'rgba(245,158,11,0.04)'); grad.addColorStop(1, 'rgba(245,158,11,0.01)');
+  ctx.fillStyle = grad; ctx.fill();
 
-  // Smooth line
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (let i = 1; i < pts.length - 2; i++) {
-    const xc = (pts[i].x + pts[i + 1].x) / 2;
-    const yc = (pts[i].y + pts[i + 1].y) / 2;
-    ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 0; i < pts.length - 2; i++) {
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2);
   }
   ctx.lineTo(last.x, last.y);
-  ctx.strokeStyle = '#f59e0b';
-  ctx.lineWidth = 2 * dpr;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-}
-
-function formatUptime(seconds) {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  let parts = [];
-  if (d > 0) parts.push(d + 'd');
-  if (h > 0) parts.push(h + 'h');
-  parts.push(m + 'm');
-  return parts.join(' ');
-}
-
-function formatStats(data) {
-  document.getElementById('uptime-val').textContent = formatUptime(data.uptime_seconds);
-  document.getElementById('cpu-val').textContent = data.cpu + '%';
-  document.getElementById('ram-val').textContent = data.ram_percent + '%';
-  document.getElementById('ram-bar').style.width = data.ram_percent + '%';
-  document.getElementById('ram-detail').textContent =
-    bytesToGb(data.ram_used) + ' / ' + bytesToGb(data.ram_total) + ' GB';
-  document.getElementById('swap-val').textContent = data.swap_percent + '%';
-  document.getElementById('swap-bar').style.width = data.swap_percent + '%';
-  document.getElementById('swap-detail').textContent =
-    bytesToGb(data.swap_used) + ' / ' + bytesToGb(data.swap_total) + ' GB';
-  document.getElementById('disk-val').textContent = data.disk_percent + '%';
-  document.getElementById('disk-bar').style.width = data.disk_percent + '%';
-  cpuHistory.push(data.cpu);
-  cpuHistory.shift();
-  drawCpuChart(cpuHistory);
+  ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2 * dpr; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
 }
 
 async function fetchStats() {
   try {
-    formatStats(await api('/system/stats'));
-  } catch {}
-}
+    const data = await api('/system/stats');
 
-/* ---- Apps ---- */
-async function loadApps() {
-  try {
-    const apps = await api('/apps/status');
-    const el = document.getElementById('app-list');
-    el.textContent = '';
-    for (const app of apps) {
-      const item = document.createElement('div');
-      item.className = 'app-item';
-      item.innerHTML = `
-        <div class="app-info">
-          <strong>${app.name}</strong>
-          <span class="app-desc">${app.desc}${app.version ? ' · v' + app.version : ''}</span>
-        </div>
-        <div class="app-action">
-          <span class="badge badge-${app.installed ? 'yes' : 'no'}">${app.installed ? app.version || 'Installed' : 'Not installed'}</span>
-          ${!app.installed ? `<button class="btn btn-sm" data-app="${app.id}">Install</button>` : ''}
-        </div>`;
-      el.appendChild(item);
-    }
-    el.querySelectorAll('[data-app]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const appId = btn.dataset.app;
-        msg('app-msg', `Installing ${appId}...`);
-        try {
-          const data = await api(`/apps/install/${appId}`, { method: 'POST' });
-          msg('app-msg', data.message);
-          setTimeout(loadApps, 5000);
-        } catch (e) {
-          msg('app-msg', e.message, true);
-        }
-      });
+    // System tray
+    document.getElementById('task-cpu').textContent = `CPU ${data.cpu}%`;
+    document.getElementById('task-ram').textContent = `RAM ${data.ram_percent}%`;
+
+    // Task Manager window
+    const cpuEl = document.getElementById('tm-cpu-val');
+    if (cpuEl) cpuEl.textContent = data.cpu + '%';
+    ['ram','swap','disk'].forEach(k => {
+      const val = document.getElementById(`tm-${k}-val`);
+      if (val) val.textContent = data[`${k}_percent`] + '%';
+      const bar = document.getElementById(`tm-${k}-bar`);
+      if (bar) bar.style.width = data[`${k}_percent`] + '%';
     });
+    const sd = document.getElementById('tm-swap-detail');
+    if (sd) sd.textContent = `${bytesToGb(data.swap_used)} / ${bytesToGb(data.swap_total)} GB`;
+    const ut = document.getElementById('tm-uptime');
+    if (ut) ut.textContent = formatUptime(data.uptime_seconds);
+
+    cpuHistory.push(data.cpu); cpuHistory.shift();
+    drawChart(cpuHistory);
   } catch {}
 }
 
-/* ---- WWW ---- */
-async function loadWww() {
-  try {
-    const data = await api('/www');
-    const el = document.getElementById('www-list');
-    el.textContent = '';
-    if (!data.items.length) {
-      el.innerHTML = '<div class="www-empty">Empty</div>';
-      return;
-    }
-    for (const item of data.items) {
-      const row = document.createElement('div');
-      row.className = 'www-row';
-      row.innerHTML = `<span>${item.is_dir ? '📁' : '📄'} ${item.name}</span>`;
-      el.appendChild(row);
-    }
-  } catch {}
+/* ========== CLOCK ========== */
+function updateClock() {
+  const now = new Date();
+  document.getElementById('task-clock').textContent =
+    now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-/* ---- Users ---- */
-async function loadUsers() {
-  try {
-    const users = await api('/auth/users');
-    const el = document.getElementById('user-list');
-    el.textContent = '';
-    for (const u of users) {
-      const row = document.createElement('div');
-      row.className = 'user-row';
-      row.innerHTML = `<span>${u.username}</span><span class="badge badge-${u.role}">${u.role}</span>`;
-      el.appendChild(row);
-    }
-  } catch {}
+/* ========== AUTH ========== */
+
+function msg(id, text, isError) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('error', 'show');
+  if (text) el.classList.add('show');
+  if (isError) el.classList.add('error');
 }
 
-/* ---- Init ---- */
 async function init() {
   try {
     const check = await api('/auth/check');
     if (token) {
       try {
         const me = await api('/auth/me');
-        return enterDashboard(me);
+        return enterDesktop(me);
       } catch { localStorage.removeItem('token'); token = null; }
     }
-    if (!check.admin_exists) show('register-form');
-    else show('login-form');
-  } catch {
-    document.getElementById('register-form').style.display = 'block';
-  }
-}
-
-async function enterDashboard(user) {
-  show('dashboard');
-  document.getElementById('user-info').textContent = `${user.username} · ${user.role}`;
-  if (user.role === 'admin') {
-    document.getElementById('tab-users-btn').style.display = 'inline-block';
-  }
-  activateTab('tab-dashboard');
-  cpuHistory = new Array(CHART_POINTS).fill(0);
-  await fetchStats();
-  if (statsInterval) clearInterval(statsInterval);
-  statsInterval = setInterval(fetchStats, 3000);
-  window.addEventListener('resize', () => drawCpuChart(cpuHistory));
-}
-
-/* ---- Events ---- */
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => activateTab(tab.dataset.tab));
-});
-
-document.querySelectorAll('.pw-toggle').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const input = document.getElementById(btn.dataset.target);
-    const open = btn.querySelector('.eye-open');
-    const closed = btn.querySelector('.eye-closed');
-    if (input.type === 'password') {
-      input.type = 'text';
-      open.style.display = 'none';
-      closed.style.display = 'block';
-    } else {
-      input.type = 'password';
-      open.style.display = 'block';
-      closed.style.display = 'none';
+    if (!check.admin_exists) {
+      document.getElementById('register-form').style.display = 'block';
+      document.getElementById('login-form').style.display = 'none';
     }
-  });
+  } catch {
+    // server down, show login anyway
+  }
+}
+
+function enterDesktop(user) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('desktop').style.display = 'flex';
+  if (user.role === 'admin') document.getElementById('start-users').style.display = 'flex';
+
+  cpuHistory = new Array(CHART_POINTS).fill(0);
+  openWindow('taskmgr', 'System Monitor');
+  fetchStats();
+  statsInterval = setInterval(fetchStats, 3000);
+  updateClock();
+  clockInterval = setInterval(updateClock, 10000);
+}
+
+/* ========== EVENT BINDINGS ========== */
+
+document.getElementById('login-btn').addEventListener('click', async () => {
+  const username = document.getElementById('login-username').value;
+  const password = document.getElementById('login-password').value;
+  try {
+    const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    token = data.access_token;
+    localStorage.setItem('token', token);
+    enterDesktop(await api('/auth/me'));
+  } catch (e) { msg('login-error', e.message, true); }
 });
 
 document.getElementById('reg-btn').addEventListener('click', async () => {
@@ -274,58 +390,80 @@ document.getElementById('reg-btn').addEventListener('click', async () => {
     await api('/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password }) });
     msg('reg-error', 'Admin created! You can now login.');
     document.getElementById('reg-btn').disabled = true;
+    setTimeout(() => {
+      document.getElementById('register-form').style.display = 'none';
+      document.getElementById('login-form').style.display = 'block';
+    }, 2000);
   } catch (e) { msg('reg-error', e.message, true); }
 });
 
-document.getElementById('login-btn').addEventListener('click', async () => {
-  const username = document.getElementById('login-username').value;
-  const password = document.getElementById('login-password').value;
-  try {
-    const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
-    token = data.access_token;
-    localStorage.setItem('token', token);
-    enterDashboard(await api('/auth/me'));
-  } catch (e) { msg('login-error', e.message, true); }
-});
-
 document.getElementById('logout-btn').addEventListener('click', () => {
-  localStorage.removeItem('token');
-  token = null;
+  localStorage.removeItem('token'); token = null;
   if (statsInterval) clearInterval(statsInterval);
+  if (clockInterval) clearInterval(clockInterval);
   location.reload();
 });
 
-document.getElementById('add-user-btn').addEventListener('click', async () => {
-  const username = document.getElementById('new-username').value;
-  const email = document.getElementById('new-email').value;
-  const password = document.getElementById('new-password').value;
-  try {
-    await api('/auth/users', { method: 'POST', body: JSON.stringify({ username, email, password, role: 'user' }) });
-    msg('add-user-error', `User ${username} created`);
-    document.getElementById('new-username').value = '';
-    document.getElementById('new-email').value = '';
-    document.getElementById('new-password').value = '';
-    loadUsers();
-  } catch (e) { msg('add-user-error', e.message, true); }
+// Start menu
+document.getElementById('start-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const menu = document.getElementById('start-menu');
+  startMenuOpen = !startMenuOpen;
+  menu.style.display = startMenuOpen ? 'block' : 'none';
 });
 
-document.getElementById('www-btn').addEventListener('click', async () => {
-  const name = document.getElementById('www-name').value;
-  try {
-    await api('/www', { method: 'POST', body: JSON.stringify({ name }) });
-    msg('www-msg', `Folder ${name} created`);
-    document.getElementById('www-name').value = '';
-    loadWww();
-  } catch (e) { msg('www-msg', e.message, true); }
+document.querySelectorAll('.start-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.getElementById('start-menu').style.display = 'none';
+    startMenuOpen = false;
+    if (item.id === 'start-logout') {
+      document.getElementById('logout-btn').click();
+      return;
+    }
+    openWindow(item.dataset.win, item.textContent.trim());
+  });
 });
 
-document.getElementById('sub-btn').addEventListener('click', async () => {
-  const subdomain = document.getElementById('sub-name').value;
-  const domain = document.getElementById('sub-domain').value;
-  try {
-    const data = await api('/subdomain', { method: 'POST', body: JSON.stringify({ subdomain, domain }) });
-    msg('sub-msg', data.message);
-  } catch (e) { msg('sub-msg', e.message, true); }
+document.addEventListener('click', (e) => {
+  if (startMenuOpen && !e.target.closest('#start-menu') && !e.target.closest('#start-btn')) {
+    document.getElementById('start-menu').style.display = 'none';
+    startMenuOpen = false;
+  }
+});
+
+// Desktop right-click context menu
+const ws = document.getElementById('desktop-workspace');
+const ctxMenu = document.getElementById('desktop-menu');
+let ctxOpen = false;
+
+ws.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  ctxMenu.style.display = 'block';
+  const w = ctxMenu.offsetWidth, h = ctxMenu.offsetHeight;
+  ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - w) + 'px';
+  ctxMenu.style.top = Math.min(e.clientY, window.innerHeight - h) + 'px';
+  ctxOpen = true;
+});
+
+document.addEventListener('click', () => {
+  if (ctxOpen) { ctxMenu.style.display = 'none'; ctxOpen = false; }
+});
+
+document.querySelectorAll('#desktop-menu .ctx-item[data-win]').forEach(item => {
+  item.addEventListener('click', () => {
+    ctxMenu.style.display = 'none'; ctxOpen = false;
+    openWindow(item.dataset.win, item.textContent.trim());
+  });
+});
+
+document.getElementById('ctx-show-desktop').addEventListener('click', () => {
+  ctxMenu.style.display = 'none'; ctxOpen = false;
+  for (const id in openWindows) closeWindow(id);
+});
+
+// Enter key on login
+document.getElementById('login-password').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('login-btn').click();
 });
 
 init();
