@@ -24,17 +24,23 @@ function show(id) {
 }
 
 async function init() {
-  const check = await api('/auth/check');
+  try {
+    const check = await api('/auth/check');
 
-  if (token) {
-    try {
-      const me = await api('/auth/me');
-      return enterDashboard(me);
-    } catch { localStorage.removeItem('token'); token = null; }
+    if (token) {
+      try {
+        const me = await api('/auth/me');
+        return enterDashboard(me);
+      } catch { localStorage.removeItem('token'); token = null; }
+    }
+
+    if (!check.admin_exists) show('register-form');
+    else show('login-form');
+  } catch (e) {
+    document.getElementById('register-form').querySelector('h2').textContent = 'Server Error';
+    document.getElementById('register-form').querySelector('.subtitle').textContent = 'Could not connect to server. Make sure the backend is running.';
+    show('register-form');
   }
-
-  if (!check.admin_exists) show('register-form');
-  else show('login-form');
 }
 
 async function enterDashboard(user) {

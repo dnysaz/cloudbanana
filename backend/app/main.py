@@ -199,6 +199,8 @@ async def serve_frontend(full_path: str):
 
 @app.exception_handler(Exception)
 async def catch_all_exception_handler(request, exc):
-    if isinstance(exc, (HTTPException, StarletteHTTPException)):
+    if isinstance(exc, StarletteHTTPException):
         raise exc
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
