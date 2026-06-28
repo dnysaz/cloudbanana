@@ -3,7 +3,8 @@ import re
 import psutil
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlmodel import Session, select
 from sqlalchemy.exc import IntegrityError
 from app.utils.system import run_command
@@ -182,5 +183,22 @@ async def trigger_app_installation(app_name: str, background_tasks: BackgroundTa
     return {"status": "success", "message": f"Installation of {app_name} started in the background."}
 
 frontend_path = Path(__file__).resolve().parent.parent.parent / "frontend"
-if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    if not frontend_path.exists():
+        raise HTTPException(status_code=404)
+    if full_path:
+        target = frontend_path / full_path
+        if target.is_file():
+            return FileResponse(target)
+    index = frontend_path / "index.html"
+    if index.exists():
+        return FileResponse(index, media_type="text/html")
+    raise HTTPException(status_code=404)
+
+@app.exception_handler(Exception)
+async def catch_all_exception_handler(request, exc):
+    if isinstance(exc, (HTTPException, StarletteHTTPException)):
+        raise exc
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
