@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -44,10 +45,14 @@
     <!-- Desktop Context Menu -->
     <div id="desktop-menu" style="display:none;">
       <button class="ctx-item" data-win="taskmgr">📊 System Monitor</button>
+      <button class="ctx-item" data-win="terminal">📟 Terminal</button>
       <button class="ctx-item" data-win="apps">📦 Software Center</button>
       <button class="ctx-item" data-win="www">📁 File Manager</button>
+      <button class="ctx-item" data-win="wget">⬇ wget</button>
       <div class="ctx-sep"></div>
       <button class="ctx-item" id="ctx-show-desktop">Show Desktop</button>
+      <button class="ctx-item" id="ctx-reload">🔄 Reload</button>
+      <button class="ctx-item" id="ctx-wallpaper">🖼 Change Wallpaper</button>
     </div>
 
     <!-- Application Menu (Start Menu) -->
@@ -55,10 +60,12 @@
       <div class="start-header">🍌 CloudBanana DE</div>
       <div class="start-body">
         <button class="start-item" data-win="taskmgr">📊 System Monitor</button>
+        <button class="start-item" data-win="terminal">📟 Terminal</button>
         <button class="start-item" data-win="apps">📦 Software Center</button>
+        <button class="start-item" data-win="www">📁 File Manager</button>
         <button class="start-item" data-win="users" id="start-users" style="display:none;">👥 Users</button>
         <button class="start-item" data-win="subdomain">🌐 Subdomain</button>
-        <button class="start-item" data-win="www">📁 File Manager</button>
+        <button class="start-item" data-win="wget">⬇ wget</button>
         <div class="ctx-sep"></div>
         <button class="start-item" id="start-logout">🔒 Lock / Log Out</button>
       </div>
@@ -68,6 +75,9 @@
     <div id="taskbar">
       <div id="task-left">
         <button id="start-btn" class="task-btn">🍌</button>
+        <button class="task-btn task-pinned" data-win="terminal" title="Terminal">📟</button>
+        <button class="task-btn task-pinned" data-win="www" title="File Manager">📁</button>
+        <button class="task-btn task-pinned" data-win="wget" title="wget">⬇</button>
         <div id="task-items"></div>
       </div>
       <div id="task-right">
@@ -80,6 +90,7 @@
 
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -1,8 +1,8 @@
-import os
-import re
-import time
+import os, re, time, secrets, shutil, subprocess, asyncio
+import pty, fcntl, struct, termios, select
 import psutil
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from datetime import datetime
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -269,6 +269,197 @@ async def create_subdomain(body: SubdomainBody, background_tasks: BackgroundTask
         enabled.symlink_to(config_path)
     background_tasks.add_task(lambda: run_command(["nginx", "-t"]) and run_command(["systemctl", "reload", "nginx"]))
     return {"status": "success", "message": f"Subdomain {body.subdomain}.{body.domain} configured"}
+
+# ========== File Manager API ==========
+
+class FileAction(BaseModel):
+    path: str
+    password: str = ""
+
+class WriteFileBody(BaseModel):
+    path: str
+    content: str
+
+def safe_path(user_path: str) -> Path:
+    p = Path(user_path).resolve()
+    if not str(p).startswith('/'):
+        raise HTTPException(status_code=400, detail="Invalid path")
+    return p
+
+def verify_root_password(password: str) -> bool:
+    try:
+        if os.geteuid() == 0:
+            import crypt
+            with open('/etc/shadow') as f:
+                for line in f:
+                    if line.startswith('root:'):
+                        hashed = line.split(':')[1]
+                        if hashed in ('*', '!', 'x'):
+                            return False
+                        return crypt.crypt(password, hashed) == hashed
+            return False
+        proc = subprocess.run(
+            ["su", "-c", "echo ok", "root"],
+            input=password + "\n", capture_output=True, text=True, timeout=5
+        )
+        return proc.returncode == 0
+    except:
+        return False
+
+@app.get("/api/v1/files")
+async def list_files(path: str = "/", user = Depends(get_current_user)):
+    p = safe_path(path)
+    if not p.exists() or not p.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+    items = []
+    for child in sorted(p.iterdir()):
+        try:
+            stat = child.stat()
+            items.append({
+                "name": child.name,
+                "is_dir": child.is_dir(),
+                "size": stat.st_size if child.is_file() else 0,
+                "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+            })
+        except PermissionError:
+            items.append({
+                "name": child.name, "is_dir": child.is_dir(),
+                "size": 0, "modified": ""
+            })
+    return {"items": items, "path": str(p)}
+
+@app.post("/api/v1/files/mkdir")
+async def create_folder(body: FileAction, user = Depends(get_current_user)):
+    p = safe_path(body.path)
+    if p.exists():
+        raise HTTPException(status_code=400, detail="Path already exists")
+    p.mkdir(parents=True, exist_ok=False)
+    return {"status": "ok"}
+
+@app.post("/api/v1/files/read")
+async def read_file(body: FileAction, user = Depends(get_current_user)):
+    p = safe_path(body.path)
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    content = p.read_text(encoding='utf-8', errors='replace')
+    return {"content": content, "path": str(p)}
+
+@app.post("/api/v1/files/write")
+async def write_file(body: WriteFileBody, user = Depends(get_current_user)):
+    p = safe_path(body.path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(body.content, encoding='utf-8')
+    return {"status": "ok"}
+
+@app.post("/api/v1/files/remove")
+async def remove_file(body: FileAction, user = Depends(get_current_user)):
+    if not body.password or not verify_root_password(body.password):
+        raise HTTPException(status_code=403, detail="Root password required")
+    p = safe_path(body.path)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Path not found")
+    if p.is_dir():
+        shutil.rmtree(p)
+    else:
+        p.unlink()
+    return {"status": "ok"}
+
+# ========== wget API ==========
+
+_wget_tasks = {}
+
+class WgetBody(BaseModel):
+    url: str
+    dir: str = "/root"
+
+@app.post("/api/v1/wget")
+async def wget_download(body: WgetBody, background_tasks: BackgroundTasks, user = Depends(get_current_user)):
+    if not re.match(r'^https?://', body.url):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+    tid = secrets.token_hex(8)
+    _wget_tasks[tid] = {"url": body.url, "status": "running", "output": ""}
+    background_tasks.add_task(_run_wget, tid, body.url, body.dir)
+    return {"task_id": tid, "status": "running"}
+
+def _run_wget(tid, url, d):
+    try:
+        result = run_command(["wget", "-P", d, url], timeout=300)
+        _wget_tasks[tid] = {"url": url, "status": "done", "output": result or "Download completed"}
+    except Exception as e:
+        _wget_tasks[tid] = {"url": url, "status": "error", "output": str(e)}
+
+@app.get("/api/v1/wget/status/{task_id}")
+async def wget_status(task_id: str, user = Depends(get_current_user)):
+    t = _wget_tasks.get(task_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return t
+
+# ========== Terminal (WebSocket PTY) ==========
+
+def _set_nonblock(fd):
+    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+def _set_winsize(fd, rows, cols):
+    winsize = struct.pack("HHHH", rows, cols, 0, 0)
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
+
+@app.websocket("/api/v1/terminal/ws")
+async def terminal_ws(ws: WebSocket):
+    await ws.accept()
+    master_fd, slave_fd = pty.openpty()
+    pid = os.fork()
+    if pid == 0:
+        os.close(master_fd)
+        os.setsid()
+        os.dup2(slave_fd, 0)
+        os.dup2(slave_fd, 1)
+        os.dup2(slave_fd, 2)
+        if slave_fd > 2:
+            os.close(slave_fd)
+        os.environ['TERM'] = 'xterm-256color'
+        os.execpe('/bin/bash', '/bin/bash', '--login', os.environ)
+    os.close(slave_fd)
+    _set_nonblock(master_fd)
+    _set_winsize(master_fd, 24, 80)
+
+    loop = asyncio.get_event_loop()
+
+    async def pty_to_ws():
+        while True:
+            try:
+                r, _, _ = select.select([master_fd], [], [], 0.05)
+                if r:
+                    data = await loop.run_in_executor(None, os.read, master_fd, 4096)
+                    if not data:
+                        break
+                    await ws.send_bytes(data)
+                else:
+                    await asyncio.sleep(0.01)
+            except:
+                break
+
+    async def ws_to_pty():
+        while True:
+            try:
+                data = await ws.receive_bytes()
+                if data.startswith(b'\x1b[8;'):
+                    try:
+                        parts = data.decode().split(';')
+                        rows = int(parts[1])
+                        cols = int(parts[2].rstrip('t'))
+                        _set_winsize(master_fd, rows, cols)
+                    except:
+                        pass
+                else:
+                    os.write(master_fd, data)
+            except:
+                break
+
+    await asyncio.gather(pty_to_ws(), ws_to_pty())
+    os.close(master_fd)
+    os.waitpid(pid, 0)
 
 frontend_path = Path(__file__).resolve().parent.parent.parent / "frontend"
 
