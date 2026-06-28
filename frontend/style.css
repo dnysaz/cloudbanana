@@ -766,7 +766,7 @@ input { font-family:inherit; outline:none; }
 }
 
 /* ========== SETTINGS ========== */
-.st-panel { display:flex; gap:0; height:100%; }
+.st-panel { display:flex; gap:0; flex:1; min-height:0; }
 .st-sidebar { width:140px; flex-shrink:0; display:flex; flex-direction:column; gap:0.15rem; border-right:1px solid var(--border-subtle); padding-right:0.5rem; }
 .st-sidebtn { display:flex; align-items:center; gap:0.35rem; background:none; border:none; color:var(--text-secondary); font-size:0.75rem; padding:0.4rem 0.5rem; border-radius:6px; cursor:pointer; font-family:inherit; text-align:left; transition:background 0.1s, color 0.1s; }
 .st-sidebtn:hover { background:var(--bg-surface); color:var(--text-primary); }

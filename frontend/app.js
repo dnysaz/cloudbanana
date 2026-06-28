@@ -177,8 +177,12 @@ function maximizeWindow(id) {
     state.maximized = false;
     state.win.querySelector('.win-max').textContent = '□';
     state.win.querySelector('.win-max').classList.remove('win-max-active');
-    // Force reflow so content resizes properly
-    void state.win.offsetHeight;
+    // Force full reflow of content inside the window
+    const rf = state.win.querySelector('.win-body');
+    rf.style.display = 'none';
+    void rf.offsetHeight;
+    rf.style.display = '';
+    window.dispatchEvent(new Event('resize'));
   } else {
     state.restore = {
       x: state.win.offsetLeft, y: state.win.offsetTop,
@@ -392,7 +396,7 @@ function renderWget(body) {
 
 function renderSettings(body) {
   body.className = 'win-body win-content';
-  body.style.padding = '0';
+  body.style.cssText = 'padding:0;display:flex;flex-direction:column';
   body.innerHTML = `<div class="st-panel">
     <div class="st-sidebar">
       <button class="st-sidebtn active" data-tab="appearance">🎨 Appearance</button>
