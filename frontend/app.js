@@ -8,7 +8,11 @@ const WIN_SIZES = {
   www: { w: 740, h: 500 },
   terminal: { w: 700, h: 420 },
   wget: { w: 460, h: 300 },
+  settings: { w: 600, h: 420 },
 };
+
+const FONTS = ['Inter', 'system-ui', 'monospace', 'Segoe UI', 'Ubuntu', 'Cantarell'];
+const FONT_SIZES = [12, 13, 14, 15, 16, 18, 20];
 
 const APP_ICONS = {
   docker: 'docker', nginx: 'nginx', apache: 'apache',
@@ -173,6 +177,8 @@ function maximizeWindow(id) {
     state.maximized = false;
     state.win.querySelector('.win-max').textContent = '□';
     state.win.querySelector('.win-max').classList.remove('win-max-active');
+    // Force reflow so content resizes properly
+    void state.win.offsetHeight;
   } else {
     state.restore = {
       x: state.win.offsetLeft, y: state.win.offsetTop,
@@ -198,6 +204,7 @@ function loadContent(id) {
   else if (id === 'www') renderFiles(body);
   else if (id === 'terminal') renderTerminal(body);
   else if (id === 'wget') renderWget(body);
+  else if (id === 'settings') renderSettings(body);
 }
 
 /* ========== TASK MANAGER ========== */
@@ -379,6 +386,116 @@ function renderWget(body) {
     } catch (e) { out.textContent = 'Error: ' + e.message; }
     document.getElementById('wget-btn').disabled = false;
   });
+}
+
+/* ========== SETTINGS ========== */
+
+function renderSettings(body) {
+  body.className = 'win-body win-content';
+  body.style.padding = '0';
+  body.innerHTML = `<div class="st-panel">
+    <div class="st-sidebar">
+      <button class="st-sidebtn active" data-tab="appearance">🎨 Appearance</button>
+      <button class="st-sidebtn" data-tab="users">👥 Users</button>
+      <button class="st-sidebtn" data-tab="about">ℹ️ About</button>
+    </div>
+    <div class="st-content" id="st-content"></div>
+  </div>`;
+  body.querySelectorAll('.st-sidebtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      body.querySelectorAll('.st-sidebtn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderSettingsTab(btn.dataset.tab);
+    });
+  });
+  renderSettingsTab('appearance');
+}
+
+function renderSettingsTab(tab) {
+  const ct = document.getElementById('st-content');
+  if (!ct) return;
+  if (tab === 'appearance') renderAppearance(ct);
+  else if (tab === 'users') renderSettingsUsers(ct);
+  else if (tab === 'about') renderAbout(ct);
+}
+
+function renderAppearance(ct) {
+  const currentTheme = localStorage.getItem('cb-theme') || 'dark';
+  const currentFont = localStorage.getItem('cb-font') || 'Inter';
+  const currentSize = localStorage.getItem('cb-size') || '13';
+  ct.innerHTML = `
+    <h3>Appearance</h3>
+    <p>Customize the look and feel of your desktop</p>
+    <div class="st-row"><span class="st-label">Theme</span>
+      <button class="st-toggle ${currentTheme === 'dark' ? 'on' : 'off'}" id="st-theme-btn"></button>
+    </div>
+    <div class="st-row">
+      <div><div class="st-label">Font</div><div class="st-desc">Interface font family</div></div>
+      <select class="st-select" id="st-font">${FONTS.map(f => `<option value="${f}"${f===currentFont?' selected':''}>${f}</option>`).join('')}</select>
+    </div>
+    <div class="st-row">
+      <div><div class="st-label">Font Size</div><div class="st-desc">Base text size in pixels</div></div>
+      <select class="st-select" id="st-size">${FONT_SIZES.map(s => `<option value="${s}"${s==Number(currentSize)?' selected':''}>${s}px</option>`).join('')}</select>
+    </div>`;
+
+  document.getElementById('st-theme-btn').addEventListener('click', () => {
+    const btn = document.getElementById('st-theme-btn');
+    const isDark = btn.classList.contains('on');
+    setTheme(isDark ? 'light' : 'dark');
+    btn.classList.toggle('on', !isDark);
+    btn.classList.toggle('off', isDark);
+  });
+  document.getElementById('st-font').addEventListener('change', (e) => setFont(e.target.value));
+  document.getElementById('st-size').addEventListener('change', (e) => setFontSize(e.target.value));
+}
+
+function setTheme(theme) {
+  document.documentElement.classList.toggle('theme-light', theme === 'light');
+  localStorage.setItem('cb-theme', theme);
+}
+
+function setFont(font) {
+  document.body.style.fontFamily = `'${font}', -apple-system, sans-serif`;
+  localStorage.setItem('cb-font', font);
+}
+
+function setFontSize(size) {
+  document.body.style.fontSize = size + 'px';
+  localStorage.setItem('cb-size', size);
+}
+
+function renderSettingsUsers(ct) {
+  ct.innerHTML = `<h3>Users</h3><p>Manage system users</p><div id="st-users-list"></div><div id="st-users-msg" class="msg"></div>`;
+  loadSettingsUsers();
+}
+
+async function loadSettingsUsers() {
+  const el = document.getElementById('st-users-list');
+  if (!el) return;
+  try {
+    const users = await api('/auth/users');
+    el.innerHTML = users.map(u => `<div class="user-row"><span>${u.username} <span class="badge badge-${u.role}">${u.role}</span></span><span style="font-size:0.7rem;color:var(--text-secondary)">${u.email}</span></div>`).join('');
+  } catch { el.innerHTML = '<div style="color:var(--text-secondary);font-size:0.78rem;">Could not load users</div>'; }
+}
+
+function renderAbout(ct) {
+  ct.innerHTML = `<div style="text-align:center;padding-top:1rem;"><div class="st-about-icon">🍌</div><h3>CloudBanana DE</h3><p>Lightweight VPS Desktop Environment</p></div>
+    <div id="st-about-info"><div style="text-align:center;color:var(--text-secondary);font-size:0.8rem;">Loading...</div></div>`;
+  loadAboutInfo();
+}
+
+async function loadAboutInfo() {
+  const el = document.getElementById('st-about-info');
+  if (!el) return;
+  try {
+    const info = await api('/system/info');
+    el.innerHTML = `
+      <div class="st-about-row"><span>Version</span><span>${info.version}</span></div>
+      <div class="st-about-row"><span>Hostname</span><span>${info.hostname}</span></div>
+      <div class="st-about-row"><span>IP Address</span><span>${info.ip_address}</span></div>
+      <div class="st-about-row"><span>Provider</span><span>${info.provider}</span></div>
+      <div class="st-about-row"><span>OS</span><span>${info.os}</span></div>`;
+  } catch { el.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:0.78rem;padding-top:1rem;">Could not fetch system info</div>'; }
 }
 
 /* ========== FILE MANAGER ========== */
@@ -748,8 +865,14 @@ function enterDesktop(user) {
   if (user.role === 'admin') document.getElementById('start-users').style.display = 'flex';
 
   cpuHistory = new Array(CHART_POINTS).fill(0);
-  const saved = localStorage.getItem('cb-wallpaper');
-  if (saved) applyWallpaper(saved);
+  const savedWp = localStorage.getItem('cb-wallpaper');
+  if (savedWp) applyWallpaper(savedWp);
+  const savedTheme = localStorage.getItem('cb-theme');
+  if (savedTheme) setTheme(savedTheme);
+  const savedFont = localStorage.getItem('cb-font');
+  if (savedFont) setFont(savedFont);
+  const savedSize = localStorage.getItem('cb-size');
+  if (savedSize) setFontSize(savedSize);
   openWindow('taskmgr', 'System Monitor');
   fetchStats();
   statsInterval = setInterval(fetchStats, 3000);

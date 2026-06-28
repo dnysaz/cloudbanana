@@ -1,5 +1,5 @@
-import os, re, time, secrets, shutil, subprocess, asyncio
-import pty, fcntl, struct, termios, select
+import os, re, time, secrets, shutil, subprocess, asyncio, threading
+import pty, fcntl, struct, termios
 import psutil
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect
@@ -364,6 +364,39 @@ async def remove_file(body: FileAction, user = Depends(get_current_user)):
         p.unlink()
     return {"status": "ok"}
 
+# ========== System Info ==========
+
+@app.get("/api/v1/system/info")
+async def get_system_info(user = Depends(get_current_user)):
+    import socket
+    hostname = socket.gethostname()
+    ip = "127.0.0.1"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(1)
+        s.connect(("10.255.255.255", 1))
+        ip = s.getsockname()[0]
+        s.close()
+    except:
+        pass
+    provider = "Unknown"
+    for path, keyword in [("/sys/class/dmi/id/product_name", "product_name"),
+                           ("/sys/hypervisor/uuid", "hypervisor")]:
+        try:
+            v = Path(path).read_text().strip()
+            if v:
+                provider = v
+                break
+        except:
+            pass
+    return {
+        "version": "0.1.0",
+        "hostname": hostname,
+        "ip_address": ip,
+        "provider": provider,
+        "os": os.uname().sysname + " " + os.uname().release,
+    }
+
 # ========== wget API ==========
 
 _wget_tasks = {}
@@ -397,10 +430,6 @@ async def wget_status(task_id: str, user = Depends(get_current_user)):
 
 # ========== Terminal (WebSocket PTY) ==========
 
-def _set_nonblock(fd):
-    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-
 def _set_winsize(fd, rows, cols):
     winsize = struct.pack("HHHH", rows, cols, 0, 0)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
@@ -421,45 +450,43 @@ async def terminal_ws(ws: WebSocket):
         os.environ['TERM'] = 'xterm-256color'
         os.execpe('/bin/bash', '/bin/bash', '--login', os.environ)
     os.close(slave_fd)
-    _set_nonblock(master_fd)
     _set_winsize(master_fd, 24, 80)
 
     loop = asyncio.get_event_loop()
+    stop_reader = threading.Event()
 
-    async def pty_to_ws():
-        while True:
+    def reader():
+        while not stop_reader.is_set():
             try:
-                r, _, _ = select.select([master_fd], [], [], 0.05)
-                if r:
-                    data = await loop.run_in_executor(None, os.read, master_fd, 4096)
-                    if not data:
-                        break
-                    await ws.send_bytes(data)
-                else:
-                    await asyncio.sleep(0.01)
+                data = os.read(master_fd, 4096)
+                if not data:
+                    break
+                asyncio.run_coroutine_threadsafe(ws.send_bytes(data), loop)
             except:
                 break
 
-    async def ws_to_pty():
-        while True:
-            try:
-                data = await ws.receive_bytes()
-                if data.startswith(b'\x1b[8;'):
-                    try:
-                        parts = data.decode().split(';')
-                        rows = int(parts[1])
-                        cols = int(parts[2].rstrip('t'))
-                        _set_winsize(master_fd, rows, cols)
-                    except:
-                        pass
-                else:
-                    os.write(master_fd, data)
-            except:
-                break
+    thread = threading.Thread(target=reader, daemon=True)
+    thread.start()
 
-    await asyncio.gather(pty_to_ws(), ws_to_pty())
-    os.close(master_fd)
-    os.waitpid(pid, 0)
+    try:
+        while True:
+            data = await ws.receive_bytes()
+            if data.startswith(b'\x1b[8;'):
+                try:
+                    parts = data.decode().split(';')
+                    rows = int(parts[1])
+                    cols = int(parts[2].rstrip('t'))
+                    _set_winsize(master_fd, rows, cols)
+                except:
+                    pass
+            else:
+                os.write(master_fd, data)
+    except:
+        pass
+    finally:
+        stop_reader.set()
+        os.close(master_fd)
+        os.waitpid(pid, 0)
 
 frontend_path = Path(__file__).resolve().parent.parent.parent / "frontend"
 
