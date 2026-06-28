@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudBanana</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="main-header">
+    <h1>🍌 CloudBanana</h1>
+    <p>Server Management Dashboard</p>
+  </header>
+
+  <div id="auth-section">
+    <div id="register-form" class="auth-box" style="display:none;">
+      <h2>Setup Admin Account</h2>
+      <p class="subtitle">Create the first admin account to get started.</p>
+      <input type="text" id="reg-username" placeholder="Username" autocomplete="off">
+      <input type="email" id="reg-email" placeholder="Email" autocomplete="off">
+      <input type="password" id="reg-password" placeholder="Password" autocomplete="new-password">
+      <button id="reg-btn" class="btn">Create Admin</button>
+      <div id="reg-error" class="msg"></div>
+    </div>
+
+    <div id="login-form" class="auth-box" style="display:none;">
+      <h2>Login</h2>
+      <input type="text" id="login-username" placeholder="Username" autocomplete="username">
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+      <button id="login-btn" class="btn">Login</button>
+      <div id="login-error" class="msg"></div>
+    </div>
+  </div>
+
+  <div id="dashboard" style="display:none;">
+    <div id="dashboard-header">
+      <span id="user-info"></span>
+      <button id="logout-btn" class="btn btn-small">Logout</button>
+    </div>
+
+    <section id="stats">
+      <h2>System Resources</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>CPU</h3>
+          <p id="cpu-usage">--</p>
+        </div>
+        <div class="stat-card">
+          <h3>RAM</h3>
+          <p id="ram-usage">--</p>
+        </div>
+        <div class="stat-card">
+          <h3>Disk</h3>
+          <p id="disk-usage">--</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="actions">
+      <h2>Quick Actions</h2>
+      <button id="install-docker" class="btn">Install Docker</button>
+      <div id="status-message" class="msg"></div>
+    </section>
+
+    <section id="admin-panel" style="display:none;">
+      <h2>User Management</h2>
+      <div class="admin-grid">
+        <div class="admin-card">
+          <h3>Add User</h3>
+          <input type="text" id="new-username" placeholder="Username">
+          <input type="email" id="new-email" placeholder="Email">
+          <input type="password" id="new-password" placeholder="Password">
+          <button id="add-user-btn" class="btn">Add User</button>
+          <div id="add-user-error" class="msg"></div>
+        </div>
+        <div class="admin-card">
+          <h3>Existing Users</h3>
+          <div id="user-list"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
