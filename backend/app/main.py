@@ -165,10 +165,17 @@ async def create_user(body: CreateUserBody, admin: User = Depends(require_admin)
 
 @app.get("/api/v1/system/stats")
 async def get_system_stats(user: User = Depends(get_current_user)):
+    mem = psutil.virtual_memory()
+    swap = psutil.swap_memory()
     return {
-        "cpu_usage": psutil.cpu_percent(interval=1),
-        "ram_usage": psutil.virtual_memory().percent,
-        "disk_usage": psutil.disk_usage('/').percent
+        "cpu": psutil.cpu_percent(interval=1),
+        "ram_percent": mem.percent,
+        "ram_used": mem.used,
+        "ram_total": mem.total,
+        "swap_percent": swap.percent,
+        "swap_used": swap.used,
+        "swap_total": swap.total,
+        "disk_percent": psutil.disk_usage('/').percent
     }
 
 @app.post("/api/v1/apps/install/{app_name}")

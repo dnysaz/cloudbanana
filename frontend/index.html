@@ -61,54 +61,99 @@
 
     <nav id="tabs">
       <button class="tab active" data-tab="tab-dashboard">Dashboard</button>
+      <button class="tab" data-tab="tab-apps">Applications</button>
       <button class="tab" data-tab="tab-users" id="tab-users-btn" style="display:none;">Users</button>
     </nav>
 
     <div id="tab-content">
       <section id="tab-dashboard" class="tab-pane active">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">CPU</div>
-            <div class="stat-value" id="cpu-usage">--</div>
+        <div class="dash-grid">
+          <div class="card chart-card">
+            <div class="card-header">
+              <span class="card-title">CPU Usage</span>
+              <span class="card-value" id="cpu-val">0%</span>
+            </div>
+            <div class="chart-wrap">
+              <svg id="cpu-chart" viewBox="0 0 300 100" preserveAspectRatio="none" class="cpu-svg"></svg>
+            </div>
           </div>
-          <div class="stat-card">
-            <div class="stat-label">RAM</div>
-            <div class="stat-value" id="ram-usage">--</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Disk</div>
-            <div class="stat-value" id="disk-usage">--</div>
+
+          <div class="mem-stack">
+            <div class="card bar-card">
+              <div class="card-header">
+                <span class="card-title">RAM</span>
+                <span class="card-value" id="ram-val">0%</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill bar-ram" id="ram-bar" style="width:0%"></div>
+              </div>
+              <div class="bar-foot"><span id="ram-detail">0 / 0 GB</span></div>
+            </div>
+            <div class="card bar-card">
+              <div class="card-header">
+                <span class="card-title">Swap</span>
+                <span class="card-value" id="swap-val">0%</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill bar-swap" id="swap-bar" style="width:0%"></div>
+              </div>
+              <div class="bar-foot"><span id="swap-detail">0 / 0 GB</span></div>
+            </div>
           </div>
         </div>
 
-        <div class="card">
-          <h3>Quick Actions</h3>
-          <button id="install-docker" class="btn">Install Docker</button>
-          <div id="status-message" class="msg"></div>
+        <div class="card bar-card">
+          <div class="card-header">
+            <span class="card-title">Disk</span>
+            <span class="card-value" id="disk-val">0%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill bar-disk" id="disk-bar" style="width:0%"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-apps" class="tab-pane">
+        <div class="constrained">
+          <div class="card">
+            <h3>Available Applications</h3>
+            <div class="app-list">
+              <div class="app-item">
+                <div class="app-info">
+                  <strong>Docker</strong>
+                  <span class="app-desc">Container runtime engine</span>
+                </div>
+                <button id="install-docker" class="btn">Install</button>
+              </div>
+            </div>
+            <div id="status-message" class="msg"></div>
+          </div>
         </div>
       </section>
 
       <section id="tab-users" class="tab-pane">
-        <div class="card">
-          <h3>Add User</h3>
-          <div class="form-row">
-            <input type="text" id="new-username" placeholder="Username">
-            <input type="email" id="new-email" placeholder="Email">
+        <div class="constrained">
+          <div class="card">
+            <h3>Add User</h3>
+            <div class="form-row">
+              <input type="text" id="new-username" placeholder="Username">
+              <input type="email" id="new-email" placeholder="Email">
+            </div>
+            <div class="pw-field" style="max-width:300px;">
+              <input type="password" id="new-password" placeholder="Password">
+              <button class="pw-toggle" data-target="new-password" type="button" aria-label="Toggle password visibility">
+                <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <button id="add-user-btn" class="btn">Add User</button>
+            <div id="add-user-error" class="msg"></div>
           </div>
-          <div class="pw-field" style="max-width:300px;">
-            <input type="password" id="new-password" placeholder="Password">
-            <button class="pw-toggle" data-target="new-password" type="button" aria-label="Toggle password visibility">
-              <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            </button>
-          </div>
-          <button id="add-user-btn" class="btn">Add User</button>
-          <div id="add-user-error" class="msg"></div>
-        </div>
 
-        <div class="card">
-          <h3>Existing Users</h3>
-          <div id="user-list"></div>
+          <div class="card">
+            <h3>Existing Users</h3>
+            <div id="user-list"></div>
+          </div>
         </div>
       </section>
     </div>

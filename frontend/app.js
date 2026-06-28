@@ -1,6 +1,9 @@
 const API = '/api/v1';
+const CHART_POINTS = 30;
 
 let token = localStorage.getItem('token');
+let cpuHistory = new Array(CHART_POINTS).fill(0);
+let statsInterval;
 
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -30,45 +33,57 @@ function activateTab(name) {
   document.getElementById(name).classList.add('active');
 }
 
-async function init() {
-  try {
-    const check = await api('/auth/check');
-
-    if (token) {
-      try {
-        const me = await api('/auth/me');
-        return enterDashboard(me);
-      } catch { localStorage.removeItem('token'); token = null; }
-    }
-
-    if (!check.admin_exists) show('register-form');
-    else show('login-form');
-  } catch (e) {
-    const box = document.getElementById('register-form');
-    box.querySelector('h2').textContent = 'Server Error';
-    box.querySelector('.subtitle').textContent = 'Could not connect to server.';
-    show('register-form');
-  }
+function bytesToGb(bytes) {
+  return (bytes / (1024 ** 3)).toFixed(1);
 }
 
-async function enterDashboard(user) {
-  show('dashboard');
-  document.getElementById('user-info').textContent = `${user.username} · ${user.role}`;
-  if (user.role === 'admin') {
-    document.getElementById('tab-users-btn').style.display = 'inline-block';
-    loadUsers();
-  }
-  activateTab('tab-dashboard');
-  fetchStats();
-  setInterval(fetchStats, 5000);
+function drawCpuChart(history) {
+  const svg = document.getElementById('cpu-chart');
+  const w = 300, h = 100;
+  const pad = 2;
+  const max = 100;
+  const points = history.map((v, i) => {
+    const x = (i / (CHART_POINTS - 1)) * (w - pad * 2) + pad;
+    const y = h - pad - (v / max) * (h - pad * 2);
+    return `${x},${y}`;
+  }).join(' ');
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="cpu-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#0071e3" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#0071e3" stop-opacity="0.01"/>
+      </linearGradient>
+    </defs>
+    <polyline fill="url(#cpu-grad)" stroke="none"
+      points="${w - pad},${h - pad} ${points} ${pad},${h - pad}"/>
+    <polyline fill="none" stroke="#0071e3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+      points="${points}"/>
+  `;
+}
+
+function formatStats(data) {
+  document.getElementById('cpu-val').textContent = data.cpu + '%';
+  document.getElementById('ram-val').textContent = data.ram_percent + '%';
+  document.getElementById('ram-bar').style.width = data.ram_percent + '%';
+  document.getElementById('ram-detail').textContent =
+    bytesToGb(data.ram_used) + ' / ' + bytesToGb(data.ram_total) + ' GB';
+  document.getElementById('swap-val').textContent = data.swap_percent + '%';
+  document.getElementById('swap-bar').style.width = data.swap_percent + '%';
+  document.getElementById('swap-detail').textContent =
+    bytesToGb(data.swap_used) + ' / ' + bytesToGb(data.swap_total) + ' GB';
+  document.getElementById('disk-val').textContent = data.disk_percent + '%';
+  document.getElementById('disk-bar').style.width = data.disk_percent + '%';
+
+  cpuHistory.push(data.cpu);
+  cpuHistory.shift();
+  drawCpuChart(cpuHistory);
 }
 
 async function fetchStats() {
   try {
     const data = await api('/system/stats');
-    document.getElementById('cpu-usage').textContent = data.cpu_usage + '%';
-    document.getElementById('ram-usage').textContent = data.ram_usage + '%';
-    document.getElementById('disk-usage').textContent = data.disk_usage + '%';
+    formatStats(data);
   } catch {}
 }
 
@@ -80,12 +95,12 @@ async function loadUsers() {
     for (const u of users) {
       const row = document.createElement('div');
       row.className = 'user-row';
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = u.username;
+      const span = document.createElement('span');
+      span.textContent = u.username;
       const badge = document.createElement('span');
       badge.className = 'badge badge-' + u.role;
       badge.textContent = u.role;
-      row.appendChild(nameSpan);
+      row.appendChild(span);
       row.appendChild(badge);
       el.appendChild(row);
     }
@@ -96,6 +111,37 @@ function msg(id, text, isError) {
   const el = document.getElementById(id);
   el.textContent = text;
   el.className = 'msg' + (isError ? ' error' : '');
+}
+
+async function init() {
+  try {
+    const check = await api('/auth/check');
+    if (token) {
+      try {
+        const me = await api('/auth/me');
+        return enterDashboard(me);
+      } catch { localStorage.removeItem('token'); token = null; }
+    }
+    if (!check.admin_exists) show('register-form');
+    else show('login-form');
+  } catch {
+    const box = document.getElementById('register-form');
+    box.style.display = 'block';
+  }
+}
+
+async function enterDashboard(user) {
+  show('dashboard');
+  document.getElementById('user-info').textContent = `${user.username} · ${user.role}`;
+  if (user.role === 'admin') {
+    document.getElementById('tab-users-btn').style.display = 'inline-block';
+    loadUsers();
+  }
+  activateTab('tab-dashboard');
+  cpuHistory = new Array(CHART_POINTS).fill(0);
+  await fetchStats();
+  if (statsInterval) clearInterval(statsInterval);
+  statsInterval = setInterval(fetchStats, 3000);
 }
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -154,6 +200,7 @@ document.getElementById('login-btn').addEventListener('click', async () => {
 document.getElementById('logout-btn').addEventListener('click', () => {
   localStorage.removeItem('token');
   token = null;
+  if (statsInterval) clearInterval(statsInterval);
   location.reload();
 });
 
