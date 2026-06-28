@@ -51,13 +51,13 @@ function drawCpuChart(history) {
   svg.innerHTML = `
     <defs>
       <linearGradient id="cpu-grad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#0071e3" stop-opacity="0.15"/>
-        <stop offset="100%" stop-color="#0071e3" stop-opacity="0.01"/>
+        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.2"/>
+        <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.02"/>
       </linearGradient>
     </defs>
     <polyline fill="url(#cpu-grad)" stroke="none"
       points="${w - pad},${h - pad} ${points} ${pad},${h - pad}"/>
-    <polyline fill="none" stroke="#0071e3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+    <polyline fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
       points="${points}"/>
   `;
 }
