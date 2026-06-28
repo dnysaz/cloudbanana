@@ -48,30 +48,77 @@ function msg(id, text, isError) {
 
 /* ---- Chart ---- */
 function drawCpuChart(history) {
-  const svg = document.getElementById('cpu-chart');
-  const w = 300, h = 100, pad = 2;
-  const max = 100;
-  const points = history.map((v, i) => {
-    const x = (i / (CHART_POINTS - 1)) * (w - pad * 2) + pad;
-    const y = h - pad - (v / max) * (h - pad * 2);
-    return `${x},${y}`;
-  }).join(' ');
+  const canvas = document.getElementById('cpu-chart');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.min(400, rect.width - 32) * dpr;
+  const h = 130 * dpr;
+  canvas.width = w;
+  canvas.height = h;
+  canvas.style.width = (w / dpr) + 'px';
+  canvas.style.height = '100px';
 
-  svg.innerHTML = `
-    <defs>
-      <linearGradient id="cpu-grad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.2"/>
-        <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.02"/>
-      </linearGradient>
-    </defs>
-    <polyline fill="url(#cpu-grad)" stroke="none"
-      points="${w - pad},${h - pad} ${points} ${pad},${h - pad}"/>
-    <polyline fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
-      points="${points}"/>
-  `;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+
+  const pad = 4 * dpr;
+  const cw = w - pad * 2;
+  const ch = h - pad * 2;
+
+  const pts = history.map((v, i) => ({
+    x: (i / (CHART_POINTS - 1)) * cw + pad,
+    y: ch + pad - (v / 100) * ch
+  }));
+
+  // Gradient fill under curve
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, ch + pad);
+  for (let i = 1; i < pts.length - 2; i++) {
+    const xc = (pts[i].x + pts[i + 1].x) / 2;
+    const yc = (pts[i].y + pts[i + 1].y) / 2;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+  }
+  const last = pts[pts.length - 1];
+  ctx.lineTo(last.x, last.y);
+  ctx.lineTo(last.x, ch + pad);
+  ctx.closePath();
+
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(245, 158, 11, 0.12)');
+  grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.04)');
+  grad.addColorStop(1, 'rgba(245, 158, 11, 0.01)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Smooth line
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length - 2; i++) {
+    const xc = (pts[i].x + pts[i + 1].x) / 2;
+    const yc = (pts[i].y + pts[i + 1].y) / 2;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+  }
+  ctx.lineTo(last.x, last.y);
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 2 * dpr;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+function formatUptime(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  let parts = [];
+  if (d > 0) parts.push(d + 'd');
+  if (h > 0) parts.push(h + 'h');
+  parts.push(m + 'm');
+  return parts.join(' ');
 }
 
 function formatStats(data) {
+  document.getElementById('uptime-val').textContent = formatUptime(data.uptime_seconds);
   document.getElementById('cpu-val').textContent = data.cpu + '%';
   document.getElementById('ram-val').textContent = data.ram_percent + '%';
   document.getElementById('ram-bar').style.width = data.ram_percent + '%';
@@ -192,6 +239,7 @@ async function enterDashboard(user) {
   await fetchStats();
   if (statsInterval) clearInterval(statsInterval);
   statsInterval = setInterval(fetchStats, 3000);
+  window.addEventListener('resize', () => drawCpuChart(cpuHistory));
 }
 
 /* ---- Events ---- */

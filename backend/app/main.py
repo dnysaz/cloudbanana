@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import psutil
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -176,7 +177,8 @@ async def get_system_stats(user: User = Depends(get_current_user)):
         "swap_percent": swap.percent,
         "swap_used": swap.used,
         "swap_total": swap.total,
-        "disk_percent": psutil.disk_usage('/').percent
+        "disk_percent": psutil.disk_usage('/').percent,
+        "uptime_seconds": int(time.time() - psutil.boot_time())
     }
 
 @app.get("/api/v1/apps/status")

@@ -70,48 +70,47 @@
 
     <div id="tab-content">
       <section id="tab-dashboard" class="tab-pane active">
+        <div id="uptime-bar">Uptime: <span id="uptime-val">--</span></div>
+
         <div class="dash-grid">
-          <div class="card chart-card">
+          <div class="card cpu-card">
             <div class="card-header">
-              <span class="card-title">CPU Usage</span>
+              <span class="card-title">CPU</span>
               <span class="card-value" id="cpu-val">0%</span>
             </div>
-            <div class="chart-wrap">
-              <svg id="cpu-chart" viewBox="0 0 300 100" preserveAspectRatio="none" class="cpu-svg"></svg>
-            </div>
+            <canvas id="cpu-chart" width="400" height="130"></canvas>
           </div>
 
           <div class="mem-stack">
             <div class="card bar-card">
-              <div class="card-header">
-                <span class="card-title">RAM</span>
-                <span class="card-value" id="ram-val">0%</span>
+              <div class="bar-label">
+                <span class="bar-name">Disk</span>
+                <span class="bar-pct" id="disk-val">0%</span>
               </div>
-              <div class="bar-track">
+              <div class="bar-track tm-track">
+                <div class="bar-fill bar-disk" id="disk-bar" style="width:0%"></div>
+              </div>
+            </div>
+            <div class="card bar-card">
+              <div class="bar-label">
+                <span class="bar-name">RAM</span>
+                <span class="bar-pct" id="ram-val">0%</span>
+              </div>
+              <div class="bar-track tm-track">
                 <div class="bar-fill bar-ram" id="ram-bar" style="width:0%"></div>
               </div>
               <div class="bar-foot"><span id="ram-detail">0 / 0 GB</span></div>
             </div>
             <div class="card bar-card">
-              <div class="card-header">
-                <span class="card-title">Swap</span>
-                <span class="card-value" id="swap-val">0%</span>
+              <div class="bar-label">
+                <span class="bar-name">Swap</span>
+                <span class="bar-pct" id="swap-val">0%</span>
               </div>
-              <div class="bar-track">
+              <div class="bar-track tm-track">
                 <div class="bar-fill bar-swap" id="swap-bar" style="width:0%"></div>
               </div>
               <div class="bar-foot"><span id="swap-detail">0 / 0 GB</span></div>
             </div>
-          </div>
-        </div>
-
-        <div class="card bar-card">
-          <div class="card-header">
-            <span class="card-title">Disk</span>
-            <span class="card-value" id="disk-val">0%</span>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill bar-disk" id="disk-bar" style="width:0%"></div>
           </div>
         </div>
       </section>
