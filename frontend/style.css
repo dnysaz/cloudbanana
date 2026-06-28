@@ -378,3 +378,30 @@ input {
 
 .badge-admin { background: #f59e0b; color: #fff; }
 .badge-user { background: #fef3c7; color: #a8a29e; }
+.badge-yes { background: #dcfce7; color: #16a34a; }
+.badge-no { background: #fef2f2; color: #dc2626; }
+
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.75rem;
+}
+
+.app-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.www-row {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid #fef3c7;
+  font-size: 0.85rem;
+}
+
+.www-row:last-child { border-bottom: none; }
+
+.www-empty {
+  color: #a8a29e;
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+}

@@ -120,16 +120,28 @@
         <div class="constrained">
           <div class="card">
             <h3>Available Applications</h3>
-            <div class="app-list">
-              <div class="app-item">
-                <div class="app-info">
-                  <strong>Docker</strong>
-                  <span class="app-desc">Container runtime engine</span>
-                </div>
-                <button id="install-docker" class="btn">Install</button>
-              </div>
+            <div id="app-list" class="app-list"></div>
+            <div id="app-msg" class="msg"></div>
+          </div>
+
+          <div class="card">
+            <h3>Subdomain</h3>
+            <div class="form-row">
+              <input type="text" id="sub-name" placeholder="Subdomain (e.g. api)">
+              <input type="text" id="sub-domain" placeholder="Domain (e.g. example.com)">
             </div>
-            <div id="status-message" class="msg"></div>
+            <button id="sub-btn" class="btn">Create Subdomain</button>
+            <div id="sub-msg" class="msg"></div>
+          </div>
+
+          <div class="card">
+            <h3>/var/www</h3>
+            <div id="www-list"></div>
+            <div class="form-row" style="margin-top:0.75rem;">
+              <input type="text" id="www-name" placeholder="New folder name">
+              <button id="www-btn" class="btn">Create</button>
+            </div>
+            <div id="www-msg" class="msg"></div>
           </div>
         </div>
       </section>

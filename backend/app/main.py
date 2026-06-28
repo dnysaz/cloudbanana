@@ -11,6 +11,7 @@ from app.utils.system import run_command
 from app.database import init_db, engine
 from app.models import User
 from app.auth import hash_password, verify_password, create_access_token, get_current_user, require_admin
+from app.apps import APPS, get_all_status, get_script_path
 from pathlib import Path
 from pydantic import BaseModel, field_validator
 
@@ -178,16 +179,94 @@ async def get_system_stats(user: User = Depends(get_current_user)):
         "disk_percent": psutil.disk_usage('/').percent
     }
 
-@app.post("/api/v1/apps/install/{app_name}")
-async def trigger_app_installation(app_name: str, background_tasks: BackgroundTasks, user: User = Depends(get_current_user)):
-    supported_apps = {"docker": "/etc/cloudbanana/scripts/install_docker.sh"}
-    script_path = supported_apps.get(app_name)
-    if not script_path:
+@app.get("/api/v1/apps/status")
+async def list_apps(user: User = Depends(get_current_user)):
+    return get_all_status()
+
+@app.post("/api/v1/apps/install/{app_id}")
+async def install_app(app_id: str, background_tasks: BackgroundTasks, user: User = Depends(get_current_user)):
+    app_def = next((a for a in APPS if a["id"] == app_id), None)
+    if not app_def:
         raise HTTPException(status_code=400, detail="Application not supported")
+    script_path = get_script_path(app_def["script"])
     if not os.path.exists(script_path):
         raise HTTPException(status_code=500, detail="Installation script not found")
     background_tasks.add_task(background_installer, script_path)
-    return {"status": "success", "message": f"Installation of {app_name} started in the background."}
+    return {"status": "success", "message": f"Installing {app_def['name']} in the background. Refresh to see version."}
+
+class CreateFolderBody(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def valid_name(cls, v):
+        if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", v):
+            raise ValueError("Invalid folder name")
+        return v
+
+class SubdomainBody(BaseModel):
+    domain: str
+    subdomain: str
+    target_dir: str = "/var/www"
+
+    @field_validator("domain")
+    @classmethod
+    def valid_domain(cls, v):
+        if not re.match(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", v):
+            raise ValueError("Invalid domain")
+        return v
+
+    @field_validator("subdomain")
+    @classmethod
+    def valid_subdomain(cls, v):
+        if not re.match(r"^[a-zA-Z0-9_-]{1,64}$", v):
+            raise ValueError("Invalid subdomain name")
+        return v
+
+@app.get("/api/v1/www")
+async def list_www(user: User = Depends(get_current_user)):
+    www = Path("/var/www")
+    if not www.exists():
+        return {"items": []}
+    items = []
+    for child in sorted(www.iterdir()):
+        items.append({
+            "name": child.name,
+            "is_dir": child.is_dir(),
+            "size": child.stat().st_size if child.is_file() else 0,
+        })
+    return {"items": items}
+
+@app.post("/api/v1/www")
+async def create_www_folder(body: CreateFolderBody, user: User = Depends(get_current_user)):
+    folder = Path("/var/www") / body.name
+    if folder.exists():
+        raise HTTPException(status_code=400, detail="Folder already exists")
+    folder.mkdir(parents=True, exist_ok=True)
+    return {"status": "success", "message": f"Folder /var/www/{body.name} created"}
+
+@app.post("/api/v1/subdomain")
+async def create_subdomain(body: SubdomainBody, background_tasks: BackgroundTasks, user: User = Depends(get_current_user)):
+    target = Path(body.target_dir)
+    config = f"""server {{
+    listen 80;
+    server_name {body.subdomain}.{body.domain};
+
+    root {target / body.subdomain};
+    index index.html index.htm index.php;
+
+    location / {{
+        try_files $uri $uri/ =404;
+    }}
+}}
+"""
+    config_path = Path(f"/etc/nginx/sites-available/{body.subdomain}.{body.domain}")
+    config_path.write_text(config)
+    enabled = Path(f"/etc/nginx/sites-enabled/{body.subdomain}.{body.domain}")
+    if not enabled.exists():
+        enabled.symlink_to(config_path)
+    background_tasks.add_task(lambda: run_command(["nginx", "-t"]) and run_command(["systemctl", "reload", "nginx"]))
+    return {"status": "success", "message": f"Subdomain {body.subdomain}.{body.domain} configured"}
 
 frontend_path = Path(__file__).resolve().parent.parent.parent / "frontend"
 
