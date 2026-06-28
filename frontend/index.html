@@ -18,7 +18,20 @@
       <p class="subtitle">Create the first admin account to get started.</p>
       <input type="text" id="reg-username" placeholder="Username" autocomplete="off">
       <input type="email" id="reg-email" placeholder="Email" autocomplete="off">
-      <input type="password" id="reg-password" placeholder="Password" autocomplete="new-password">
+      <div class="pw-field">
+        <input type="password" id="reg-password" placeholder="Password" autocomplete="new-password">
+        <button class="pw-toggle" data-target="reg-password" type="button" aria-label="Toggle password visibility">
+          <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
+      <div class="pw-field">
+        <input type="password" id="reg-password-confirm" placeholder="Confirm Password" autocomplete="new-password">
+        <button class="pw-toggle" data-target="reg-password-confirm" type="button" aria-label="Toggle password visibility">
+          <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
       <button id="reg-btn" class="btn">Create Admin</button>
       <div id="reg-error" class="msg"></div>
     </div>
@@ -26,7 +39,13 @@
     <div id="login-form" class="auth-box" style="display:none;">
       <h2>Login</h2>
       <input type="text" id="login-username" placeholder="Username" autocomplete="username">
-      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+      <div class="pw-field">
+        <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+        <button class="pw-toggle" data-target="login-password" type="button" aria-label="Toggle password visibility">
+          <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
       <button id="login-btn" class="btn">Login</button>
       <div id="login-error" class="msg"></div>
     </div>
@@ -69,7 +88,13 @@
           <h3>Add User</h3>
           <input type="text" id="new-username" placeholder="Username">
           <input type="email" id="new-email" placeholder="Email">
-          <input type="password" id="new-password" placeholder="Password">
+          <div class="pw-field">
+            <input type="password" id="new-password" placeholder="Password">
+            <button class="pw-toggle" data-target="new-password" type="button" aria-label="Toggle password visibility">
+              <svg class="eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-closed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
           <button id="add-user-btn" class="btn">Add User</button>
           <div id="add-user-error" class="msg"></div>
         </div>

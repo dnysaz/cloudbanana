@@ -63,6 +63,35 @@ h2 {
   border-color: #f5a623;
 }
 
+.pw-field {
+  position: relative;
+  margin-bottom: 0.75rem;
+}
+
+.pw-field input {
+  margin-bottom: 0;
+  padding-right: 3rem;
+}
+
+.pw-toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 2.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.pw-toggle:hover svg {
+  stroke: #f5a623;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -184,6 +213,15 @@ h2 {
 .admin-card input:focus {
   outline: none;
   border-color: #f5a623;
+}
+
+.admin-card .pw-field {
+  margin-bottom: 0.5rem;
+}
+
+.admin-card .pw-field input {
+  margin-bottom: 0;
+  padding-right: 2.5rem;
 }
 
 #user-list {

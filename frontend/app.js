@@ -81,6 +81,11 @@ document.getElementById('reg-btn').addEventListener('click', async () => {
   const username = document.getElementById('reg-username').value;
   const email = document.getElementById('reg-email').value;
   const password = document.getElementById('reg-password').value;
+  const confirm = document.getElementById('reg-password-confirm').value;
+  if (password !== confirm) {
+    msg('reg-error', 'Passwords do not match', true);
+    return;
+  }
   try {
     await api('/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password }) });
     msg('reg-error', 'Admin created! You can now login.');
@@ -134,6 +139,23 @@ document.getElementById('add-user-btn').addEventListener('click', async () => {
   } catch (e) {
     msg('add-user-error', e.message, true);
   }
+});
+
+document.querySelectorAll('.pw-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.target);
+    const open = btn.querySelector('.eye-open');
+    const closed = btn.querySelector('.eye-closed');
+    if (input.type === 'password') {
+      input.type = 'text';
+      open.style.display = 'none';
+      closed.style.display = 'block';
+    } else {
+      input.type = 'password';
+      open.style.display = 'block';
+      closed.style.display = 'none';
+    }
+  });
 });
 
 init();

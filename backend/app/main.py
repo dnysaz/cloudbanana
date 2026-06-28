@@ -23,10 +23,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-frontend_path = Path(__file__).resolve().parent.parent.parent / "frontend"
-if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
-
 @app.on_event("startup")
 def on_startup():
     init_db()
@@ -184,3 +180,7 @@ async def trigger_app_installation(app_name: str, background_tasks: BackgroundTa
         raise HTTPException(status_code=500, detail="Installation script not found")
     background_tasks.add_task(background_installer, script_path)
     return {"status": "success", "message": f"Installation of {app_name} started in the background."}
+
+frontend_path = Path(__file__).resolve().parent.parent.parent / "frontend"
+if frontend_path.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
