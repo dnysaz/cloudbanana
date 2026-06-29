@@ -827,6 +827,34 @@ async function fetchStats() {
   } catch {}
 }
 
+/* ========== FULLSCREEN ========== */
+function renderTaskbarFullscreenBtn() {
+  const btn = document.getElementById('fullscreen-btn');
+  if (!btn) return;
+  btn.addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', updateFullscreenIcon);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  } else {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }
+}
+
+function updateFullscreenIcon() {
+  const btn = document.getElementById('fullscreen-btn');
+  if (!btn) return;
+  const fs = document.fullscreenElement || document.webkitFullscreenElement;
+  btn.textContent = fs ? '✕' : '⛶';
+  btn.title = fs ? 'Exit Fullscreen' : 'Toggle Fullscreen';
+}
+
 /* ========== CLOCK ========== */
 function updateClock() {
   const now = new Date();
@@ -877,6 +905,7 @@ function enterDesktop(user) {
   if (savedFont) setFont(savedFont);
   const savedSize = localStorage.getItem('cb-size');
   if (savedSize) setFontSize(savedSize);
+  renderTaskbarFullscreenBtn();
   openWindow('taskmgr', 'System Monitor');
   fetchStats();
   statsInterval = setInterval(fetchStats, 3000);
