@@ -138,6 +138,12 @@ async def login(body: LoginBody):
 async def get_me(user: User = Depends(get_current_user)):
     return {"id": user.id, "username": user.username, "email": user.email, "role": user.role}
 
+@app.get("/api/v1/auth/users/public")
+async def list_users_public():
+    with Session(engine) as session:
+        users = session.exec(select(User)).all()
+        return [{"username": u.username, "role": u.role} for u in users]
+
 @app.get("/api/v1/auth/users")
 async def list_users(admin: User = Depends(require_admin)):
     with Session(engine) as session:

@@ -18,11 +18,13 @@
       <div class="login-logo">🍌</div>
       <h1 class="login-title">CloudBanana DE</h1>
       <p class="login-desc">Lightweight VPS Desktop Environment</p>
-      <div id="login-form">
-        <input type="text" id="login-username" placeholder="Username">
+      <div id="login-user-list" class="login-user-list"></div>
+      <div id="login-pwd-form" style="display:none;">
+        <div class="login-selected-user" id="login-selected-user"></div>
         <input type="password" id="login-password" placeholder="Password">
         <button id="login-btn" class="login-btn">Log In</button>
         <div id="login-error" class="login-msg"></div>
+        <button class="login-back-btn" id="login-back-btn">Not you?</button>
       </div>
       <div id="register-form" style="display:none;">
         <input type="text" id="reg-username" placeholder="Username">
@@ -32,6 +34,7 @@
         <button id="reg-btn" class="login-btn">Create Admin</button>
         <div id="reg-error" class="login-msg"></div>
       </div>
+      <div id="login-loading" class="login-loading">Loading...</div>
     </div>
     <div class="login-footer">CloudBanana DE v0.1 · Session: VPS Desktop</div>
   </div>

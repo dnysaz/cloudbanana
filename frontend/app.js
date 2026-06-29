@@ -41,6 +41,7 @@ let statsInterval, clockInterval;
 let winZIndex = 100;
 let openWindows = {};
 let startMenuOpen = false;
+let selectedUser = null;
 
 /* ========== API ========== */
 async function api(path, opts = {}) {
@@ -874,21 +875,54 @@ function msg(id, text, isError) {
 }
 
 async function init() {
+  document.getElementById('login-loading').style.display = 'block';
   try {
-    const check = await api('/auth/check');
     if (token) {
       try {
         const me = await api('/auth/me');
+        document.getElementById('login-loading').style.display = 'none';
         return enterDesktop(me);
       } catch { localStorage.removeItem('token'); token = null; }
     }
-    if (!check.admin_exists) {
+    const check = await api('/auth/check');
+    if (check.admin_exists) {
+      document.getElementById('login-loading').style.display = 'none';
+      renderLoginUsers();
+    } else {
+      document.getElementById('login-loading').style.display = 'none';
       document.getElementById('register-form').style.display = 'block';
-      document.getElementById('login-form').style.display = 'none';
     }
   } catch {
-    // server down, show login anyway
+    document.getElementById('login-loading').style.display = 'none';
   }
+}
+
+function renderLoginUsers() {
+  const list = document.getElementById('login-user-list');
+  list.innerHTML = '';
+  api('/auth/users/public').then(users => {
+    if (!users.length) return;
+    users.forEach(u => {
+      const btn = document.createElement('button');
+      btn.className = 'login-user-btn';
+      btn.innerHTML = `<div class="login-user-avatar">👤</div><span class="login-user-name">${u.username}</span>`;
+      btn.addEventListener('click', () => selectLoginUser(u.username));
+      list.appendChild(btn);
+    });
+  }).catch(() => {});
+}
+
+function selectLoginUser(username) {
+  selectedUser = username;
+  document.getElementById('login-user-list').style.display = 'none';
+  document.getElementById('login-pwd-form').style.display = 'block';
+  document.getElementById('login-selected-user').innerHTML =
+    `<div class="login-user-avatar">👤</div><span>${username}</span>`;
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-error').classList.remove('show', 'error');
+  const pwd = document.getElementById('login-password');
+  pwd.value = '';
+  pwd.focus();
 }
 
 function enterDesktop(user) {
@@ -916,14 +950,23 @@ function enterDesktop(user) {
 /* ========== EVENT BINDINGS ========== */
 
 document.getElementById('login-btn').addEventListener('click', async () => {
-  const username = document.getElementById('login-username').value;
+  if (!selectedUser) return;
   const password = document.getElementById('login-password').value;
+  if (!password) return;
   try {
-    const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ username: selectedUser, password }) });
     token = data.access_token;
     localStorage.setItem('token', token);
     enterDesktop(await api('/auth/me'));
   } catch (e) { msg('login-error', e.message, true); }
+});
+
+document.getElementById('login-back-btn').addEventListener('click', () => {
+  selectedUser = null;
+  document.getElementById('login-pwd-form').style.display = 'none';
+  document.getElementById('login-user-list').style.display = '';
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-error').classList.remove('show', 'error');
 });
 
 document.getElementById('reg-btn').addEventListener('click', async () => {

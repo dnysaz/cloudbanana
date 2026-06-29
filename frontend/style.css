@@ -100,6 +100,62 @@ input { font-family:inherit; outline:none; }
 
 .login-card input::placeholder { color:var(--text-muted); }
 
+.login-user-list {
+  display:flex; flex-wrap:wrap; gap:0.6rem; justify-content:center;
+  margin-bottom:0.75rem; min-height:0;
+}
+
+.login-user-btn {
+  display:flex; flex-direction:column; align-items:center; gap:0.25rem;
+  background:none; border:2px solid transparent; border-radius:12px;
+  cursor:pointer; padding:0.6rem 0.5rem 0.4rem;
+  transition:border-color 0.15s, background 0.15s;
+  min-width:0; flex:0 0 auto;
+  font-family:inherit;
+}
+
+.login-user-btn:hover { border-color:var(--border-input); background:var(--bg-surface); }
+
+.login-user-avatar {
+  width:52px; height:52px; border-radius:50%;
+  background:var(--bg-surface); display:flex;
+  align-items:center; justify-content:center;
+  font-size:1.5rem; border:2px solid var(--border-input);
+  transition:border-color 0.15s;
+}
+
+.login-user-btn:hover .login-user-avatar { border-color:var(--accent); }
+
+.login-user-name {
+  font-size:0.7rem; color:var(--text-secondary); font-weight:500;
+  overflow:hidden; text-overflow:ellipsis; max-width:72px;
+  white-space:nowrap;
+}
+
+.login-selected-user {
+  display:flex; align-items:center; justify-content:center; gap:0.5rem;
+  font-size:0.9rem; font-weight:600; color:var(--text-primary);
+  margin-bottom:0.75rem;
+}
+
+.login-selected-user .login-user-avatar {
+  width:40px; height:40px; font-size:1.1rem;
+}
+
+.login-back-btn {
+  width:100%; background:none; border:none;
+  color:var(--text-muted); font-size:0.75rem;
+  cursor:pointer; padding:0.4rem; font-family:inherit;
+  transition:color 0.15s; margin-top:0.25rem;
+}
+
+.login-back-btn:hover { color:var(--text-secondary); }
+
+.login-loading {
+  text-align:center; padding:1rem; color:var(--text-secondary);
+  font-size:0.8rem;
+}
+
 .login-btn {
   width:100%; display:block;
   background: var(--accent); color:var(--bg-root);
